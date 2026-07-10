@@ -2,8 +2,7 @@
 
 A machine learning project to classify news articles as **fake (0)** or **real (1)**
 based on their `title` and `text`, comparing multiple feature-extraction methods
-(Bag of Words, TF-IDF, Word2Vec) and models (Logistic Regression, Naive Bayes,
-Random Forest, SVM)
+(Bag of Words, TF-IDF, Word2Vec) and classical classification models.
 
 ## Dataset
 
@@ -20,12 +19,19 @@ Random Forest, SVM)
 ## Project Structure
 
 ```
-├── dataset/                                   # all datasets
-├── notebooks/                                 # all notebooks
-│   └── model_comparison_final_selection.ipynb # compare all runs, pick 
-├── utils.py                                   # shared cleaning/training/persistence functions
-├── results_logs.jsonl                         # append-only log of every model run
-├── saved_models/                              # pickled fitted models
+├── dataset/                                   # raw and validation datasets
+├── files/                                     # extra files, ppt, images
+├── notebooks/                                 # training and evaluation notebooks
+│   ├── EDA.ipynb                              # exploratory data analysis and leakage checks
+│   ├── data_cleaning_combined.ipynb           # anaylsis for data leakage
+│   ├── method_bow.ipynb                        # Bag of Words pipeline
+│   ├── method_tfidf.ipynb                      # TF-IDF pipeline
+│   ├── method_word2vec.ipynb                   # Word2Vec pipeline
+│   └── model_comparison_final_selection.ipynb  # compare results and select the final model
+├── models/                                    # pickled trained model files
+├── utils.py                                   # preprocessing, evaluation helper functions
+├── results_logs.jsonl                         # model result logs
+├── validation_data_preds.csv                  # test batch prediction output
 └── README.md
 ```
 
@@ -37,17 +43,13 @@ pip install -r requirements.txt
 
 ## Workflow
 
-Run in this order:
-
-1. **`EDA.ipynb`** — explore the data, check label/subject/date distributions, and identify
-   data-leakage risks. Decides to drop `subject` and `date` (both leak the label).
-2. **Different pipeline notebooks** — each cleans/preprocesses
-   the text, extracts features with its respective method, trains several models, and
-   logs results to `results_logs.jsonl` + `models/`. These share cached cleaned
-   text (`X_train_clean.csv` / `X_test_clean.csv`) and reusable functions from `utils.py`.
-3. **`model_comparison_final_selection.ipynb`** — loads all logged results across every
-   method, compares them, lets you manually pick the final model, evaluates it on the
-   held-out test set, and exports a deployment bundle (`deployment/model_bundle.pkl`).
+1. **`EDA.ipynb`** — inspect class balance, feature distributions, and label leakage.
+   This analysis supports dropping `subject` and `date` from model inputs.
+2. **`method_bow.ipynb`, `method_tfidf.ipynb`, `method_word2vec.ipynb`** — train models
+   with the specified feature extraction method, log results to `results_logs.jsonl`,
+   and save fitted models to `models/`.
+3. **`model_comparison_final_selection.ipynb`** — load the shared run log and compare
+   model performance across feature methods and classifiers to determine the best model.
 
 
 ## Key Findings
@@ -55,20 +57,21 @@ Run in this order:
 - **`subject` and `date` leak the label** — several subjects map almost entirely to one
   class, so both columns were dropped as model features.
 - **Bag of Words** was the strongest feature-extraction method overall, edging out TF-IDF;
-  **Word2Vec** (average word vectors) was the weakest of the three.
+  Word2Vec (average word vectors) was the weakest of the three.
 - **Random Forest + BoW** was the best-performing model (F1 ≈ 0.999).
-- **Logistic Regression + BoW** was selected as a fast, strong
+- **Logistic Regression + BoW** (F1 ≈ 0.9966) was selected as a fast, strong
   baseline, for evaluation at inference time.
-- Duplicate rows (same `title` + `text`) were found and should be removed **before**
-  the train/test split to avoid leakage across the split.
 
 
-## Predicting on New/Validation Data
+## Predicting on New Data
 
-For batch prediction on a separate file (e.g. an unlabeled validation set), load the
-deployment bundle, preprocess with `utils.preprocess_text_columns()`, transform with the
-bundle's saved vectorizer(s) (transform only — never re-fit), and predict. See the
-project notebooks/scripts for the full batch-prediction snippet.
+To predict on a new dataset:
+
+1. Load a saved model from `models/`.
+2. Preprocess text using `utils.preprocess_text_columns()`.
+3. Transform cleaned text using the same fitted vectorizer(s) used during training.
+4. Use the loaded model to predict and save outputs, e.g. to `validation_data_preds.csv`.
+
 
 ## Possible Next Steps
 
